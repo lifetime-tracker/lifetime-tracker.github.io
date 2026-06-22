@@ -1,51 +1,37 @@
 const CACHE_NAME = "timeflow-v5";
-const ASSETS = [
-  "/",
-  "/index.html",
-  "/manifest.json"
-];
 
-self.addEventListener("install", e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(c => c.addAll(ASSETS))
-      .then(() => self.skipWaiting())
-  );
-});
+// Install: skip waiting immediately, no pre-caching (avoids addAll failures)
+self.addEventListener("install", () => self.skipWaiting());
 
+// Activate: clear old caches
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(ks => Promise.all(ks.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
+// Fetch: only intercept same-origin GET requests
 self.addEventListener("fetch", e => {
-  // Never intercept Anthropic API calls
-  if (new URL(e.request.url).hostname === "api.anthropic.com") {
-    e.respondWith(fetch(e.request));
-    return;
-  }
-  // Never intercept Google Fonts
-  if (new URL(e.request.url).hostname === "fonts.googleapis.com" ||
-      new URL(e.request.url).hostname === "fonts.gstatic.com") {
-    e.respondWith(fetch(e.request));
-    return;
-  }
+  const url = new URL(e.request.url);
+
+  // Never intercept cross-origin requests (API, fonts, etc.)
+  if (url.origin !== self.location.origin) return;
+
+  // Only cache GET
+  if (e.request.method !== "GET") return;
+
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
-      return fetch(e.request).then(r => {
-        if (r.ok && e.request.method === "GET") {
-          caches.open(CACHE_NAME).then(cache => cache.put(e.request, r.clone()));
+      return fetch(e.request).then(response => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
         }
-        return r;
+        return response;
       });
-    }).catch(() => {
-      if (e.request.mode === "navigate") {
-        return caches.match("/index.html");
-      }
     })
   );
 });
