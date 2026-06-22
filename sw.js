@@ -1,8 +1,8 @@
 const CACHE_NAME = "timeflow-v5";
 const ASSETS = [
-  "/timeflow/",
-  "/timeflow/index.html",
-  "/timeflow/manifest.json"
+  "/",
+  "/index.html",
+  "/manifest.json"
 ];
 
 self.addEventListener("install", e => {
@@ -44,7 +44,7 @@ self.addEventListener("fetch", e => {
       });
     }).catch(() => {
       if (e.request.mode === "navigate") {
-        return caches.match("/timeflow/index.html");
+        return caches.match("/index.html");
       }
     })
   );
